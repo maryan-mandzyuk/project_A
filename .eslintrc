@@ -3,7 +3,6 @@
     "wesbos"
   ],
   "rules": {
-    "no-console": 2,
     "prettier/prettier": [
       "error",
       {
@@ -12,6 +11,7 @@
         "printWidth": 120,
         "tabWidth": 4
       }
-    ]
+    ],
+    "no-console": "warn"
   }
 }
