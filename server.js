@@ -1,21 +1,20 @@
 const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
 const connectDB = require('./src/db');
+const errorHandler = require('./src/middleware/errorHandler');
+const parser = require('./src/parser');
 require('dotenv').config();
 
-const app = express();
-connectDB();
-app.get('/', async () => {
-    const res = await axios.get('https://nashformat.ua/catalog/novynky');
-    const $ = cheerio.load(res.data);
-    const html = $('.product-list_title h5 a');
-    html.each((index, element) => {
-        const title = cheerio.load(element);
-        console.log(title.text());
-    });
-});
+const book = require('./src/routes/book');
 
+const app = express();
+app.use(express.json());
+connectDB();
+
+app.use('api/v1/book', book);
+
+parser();
+
+app.use(errorHandler);
 const port = process.env.PORT;
 
 app.listen(port, () => console.log(`Server started on port ${port}`));

@@ -5,16 +5,17 @@ const { Schema } = mongoose;
 const BookSchema = new Schema({
     title: {
         type: String,
-        required: true,
-        maxlength: 50,
+        required: [true, 'Title is required'],
+        maxlength: [50, 'Title can not be more than 50 characters'],
+        trim: true,
     },
     originalTitle: {
         type: String,
-        maxlength: 50,
+        maxlength: [50, 'Original title can not be more than 50 characters'],
     },
     description: {
         type: String,
-        maxlength: 255,
+        maxlength: [500, 'Description can not be more than 500 characters'],
     },
     author: {
         type: Schema.Types.ObjectId,
@@ -24,23 +25,30 @@ const BookSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'publisher',
     },
-    pageNuber: {
+    pageNumber: {
         type: Number,
-        max: 5000,
+        max: [5000, 'Number of page can not be more than 5000'],
     },
     translator: {
-        type: String,
-        maxlength: 50,
+        type: Schema.Types.ObjectId,
+        ref: 'translator',
     },
     publicationYear: {
         type: String,
-        maxlength: 4,
+        maxlength: [4, 'Year can not be more than 4 characters'],
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
+    updatedAt: {
+        type: Date,
     },
     properties: [
         {
             ISBN: {
                 type: String,
-                required: true,
+                required: [true, 'ISBN is required'],
                 unique: true,
             },
             format: {
@@ -55,22 +63,26 @@ const BookSchema = new Schema({
                     },
                     link: {
                         type: String,
-                        required: true,
+                        required: [true, 'Link is required'],
+                        match: [
+                            /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/,
+                            'Please use a valid URL with HTTP or HTTPS',
+                        ],
                     },
                     currentPrice: {
                         type: Number,
-                        required: true,
-                        max: 5000,
+                        required: [true, 'Current price is required'],
+                        max: [5000, 'Current price can not be more than 5000'],
                     },
                     previousPrice: {
                         type: Number,
-                        required: true,
-                        max: 5000,
+                        required: [true, 'Previous price is required'],
+                        max: [5000, 'Previous price can not be more than 5000'],
                     },
                     minimalPrice: {
                         type: Number,
-                        required: true,
-                        max: 5000,
+                        required: [true, 'Minimal price is required'],
+                        max: [5000, 'Minimal price can not be more than 5000'],
                     },
                 },
             ],
