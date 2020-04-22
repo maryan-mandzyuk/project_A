@@ -3,97 +3,160 @@ const cheerio = require('cheerio');
 
 const nashFormat = 'https://nashformat.ua/search?keyword=%D0%BA%D0%BE%D0%B1%D0%B7%D0%B0%D1%80&sort=views';
 
+const selectors = {
+    listItems: '.row.list.item',
+    listBookLink: '.product-list_title h5 a',
+    tablePropAttr: '.attr',
+    tablePropValue: '.value',
+    infoTableRows: '#features tbody tr',
+    title: '.product h1',
+    imageLink: '#main_image img',
+    auhor: 'Автор',
+    publisher: 'Видавництво',
+    publicationYear: 'Рік видання',
+    isbn: 'ISBN',
+    pageNumber: 'Кількість сторінок',
+    translator: 'Перекладачі',
+    originalTitle: 'Оригінальна назва',
+    paperPrice: '#tabsPaper',
+    ebookPrice: '#tabsElectronic',
+    paperLink: '#tabsPaper',
+    ebookLink: '#tabsElectronic',
+    checkIfPaper: '#tabsPaper[class~="active"]',
+};
+
 const getLinksBySeacrh = async link => {
     const res = await axios.get(link);
     const $ = cheerio.load(res.data);
-    const listItems = $('.row.list.item');
+    const listItems = $(selectors.listItems);
     listItems.splice(5);
     const linksList = [];
     listItems.each((index, element) => {
         const item = cheerio.load(element);
-        const bookLink = item('.product-list_title h5 a').attr('href');
-        const bookTitle = item('.product-list_title h5 a').text();
-        linksList.push({ bookLink, bookTitle });
+        const bookLink = item(selectors.listBookLink).attr('href');
+        linksList.push(bookLink);
     });
     return linksList;
 };
 
-const getBookInfo = async link => {
-    const bookInfo = {};
-    const res = await axios.get(
-        'https://nashformat.ua/products/ebook-ploschi-ta-vezhi.-sotsialni-zv-yazky-vid-masoniv-do-fejsbuku-620157'
-    );
-    const $ = cheerio.load(res.data);
-
-    // if ebook
-    const typeButton = $('#tabsPaper[class~="active"]').get().length;
-    if (typeButton > 0) {
-        const paperPrice = $('#tabsPaper .tab-price')
-            .text()
-            .replace(/\D/g, '');
-
-        bookInfo.paperPrice = parseInt(paperPrice);
-        bookInfo.ebook = false;
-    } else {
-        const ebookPrice = $('#tabsElectronic .tab-price')
-            .text()
-            .replace(/\D/g, '');
-        bookInfo.ebookPrice = parseInt(ebookPrice);
-
-        bookInfo.ebook = true;
-    }
-
-    // ---------------------
-
-    const table = $('#features tbody tr');
+const getTableProps = tableRows => {
     const tableProps = [];
 
-    table.each((index, element) => {
+    tableRows.each((index, element) => {
         const item = cheerio.load(element);
-        const attr = item('.attr')
+        const attr = item(selectors.tablePropAttr)
             .text()
             .trim();
-        const value = item('.value')
+        const value = item(selectors.tablePropValue)
             .text()
             .trim();
         tableProps.push({ attr, value });
     });
+    return tableProps;
+};
+
+const getIsbn = async link => {
+    const res = await axios.get(link);
+    const $ = cheerio.load(res.data);
+
+    const table = $();
+    const tableProps = getTableProps(table);
+
+    const isbn = tableProps.find(el => el.attr === 'ISBN');
+    return isbn.value;
+};
+
+const getBookInfo = async link => {
+    const bookInfo = {};
+    const res = await axios.get(link);
+    const $ = cheerio.load(res.data);
+
+    bookInfo.title = $(selectors.title)
+        .text()
+        .replace(/.*?«(.*)».*/, '$1');
+    bookInfo.image = $(selectors.imageLink).attr('src');
+
+    const tableRows = $(selectors.infoTableRows);
+    const tableProps = getTableProps(tableRows);
+
+    let isbn;
     tableProps.forEach(el => {
         switch (el.attr) {
-            case 'Автор':
+            case selectors.auhor:
                 bookInfo.author = el.value;
                 break;
-            case 'Видавництво':
+            case selectors.publisher:
                 bookInfo.publisher = el.value;
                 break;
-            case 'Рік видання':
+            case selectors.publicationYear:
                 bookInfo.publicationYear = el.value;
                 break;
-            case 'Перекладачі':
+            case selectors.translator:
                 bookInfo.translator = el.value;
                 break;
-            case 'ISBN':
-                bookInfo.isbn = el.value;
+            case selectors.isbn:
+                isbn = el.value;
                 break;
-            case 'Кількість сторінок':
+            case selectors.pageNumber:
                 bookInfo.pageNumber = parseInt(el.value.replace(/\D/g, ''));
                 break;
-            case 'Оригінальна назва':
+            case selectors.originalTitle:
                 bookInfo.originalTitle = el.value;
                 break;
             default:
                 break;
         }
     });
+    const paperPrice = $(selectors.paperPrice)
+        .text()
+        .replace(/\D/g, '');
 
-    bookInfo.title = link.bookTitle;
+    const ebookPrice = $(selectors.ebookPrice)
+        .text()
+        .replace(/\D/g, '');
+
+    bookInfo.paper = {
+        price: parseInt(paperPrice),
+    };
+    bookInfo.ebook = {
+        price: parseInt(ebookPrice),
+    };
+
+    // check if book is paper
+    const typeButton = $(selectors.checkIfPaper).get().length;
+    if (typeButton > 0) {
+        bookInfo.isEbook = false;
+        bookInfo.paper.isbn = isbn;
+        bookInfo.paper.link = link;
+
+        const ebookLink = $(selectors.ebookLink).attr('href');
+        if (ebookLink) {
+            bookInfo.ebook.isbn = await getIsbn(ebookLink);
+            bookInfo.ebook.link = ebookLink;
+        }
+    } else {
+        bookInfo.isEbook = true;
+        bookInfo.ebook.isbn = isbn;
+        bookInfo.ebook.link = link;
+
+        const paperLink = $(selectors.paperLink).attr('href');
+        if (paperLink) {
+            bookInfo.paper.isbn = await getIsbn(paperLink);
+            bookInfo.paper.link = paperLink;
+        }
+    }
 
     return bookInfo;
 };
 
 const parser = async () => {
-    const links = await getLinksBySeacrh(nashFormat);
-    const bookInfo = await getBookInfo(links[0]);
+    const testLink =
+        'https://nashformat.ua/products/ebook-ploschi-ta-vezhi.-sotsialni-zv-yazky-vid-masoniv-do-fejsbuku-620157';
+    // const links = await getLinksBySeacrh(nashFormat);
+    const bookInfo = await getBookInfo(
+        'https://nashformat.ua/products/sekrety-mozku.-12-strategij-rozvytku-dytyny-nova-obkladynka-709337'
+    );
+
     console.log(bookInfo);
 };
 
