@@ -11,12 +11,12 @@ const app = express();
 app.use(express.json());
 connectDB();
 
-app.use('api/v1/books', books);
-app.use('api/v1/sellers', sellers);
+app.use('/api/v1/books', books);
+app.use('/api/v1/sellers', sellers);
 
-parser();
+// parser();
 
 app.use(errorHandler);
-const port = process.env.PORT;
+const port = process.env.PORT || 5000;
 
 app.listen(port, () => console.log(`Server started on port ${port}`));
