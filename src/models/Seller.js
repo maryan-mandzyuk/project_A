@@ -37,6 +37,11 @@ const SellerSchema = new Schema({
             paperLink: String,
             ebookLink: String,
             checkIfPaper: String,
+            checkOtherFormat: Boolean,
+            paperFormat: String,
+            ebookFormat: String,
+            splitAttr: Boolean,
+            splitSymbol: String,
         },
     },
 });

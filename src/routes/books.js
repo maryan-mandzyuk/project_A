@@ -1,8 +1,13 @@
 const express = require('express');
-const { createBook } = require('../controllers/books');
+const { createBook, getBook, getBooks } = require('../controllers');
 
 const router = express.Router();
 
-router.post(createBook);
+router
+    .route('/')
+    .get(getBooks)
+    .post(createBook);
+
+router.route('/:id').get(getBook);
 
 module.exports = router;

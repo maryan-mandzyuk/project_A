@@ -4,25 +4,31 @@ const cheerio = require('cheerio');
 const nashFormat = 'https://nashformat.ua/search?keyword=%D0%BA%D0%BE%D0%B1%D0%B7%D0%B0%D1%80&sort=views';
 
 const selectors = {
-    listItems: '.row.list.item',
-    listBookLink: '.product-list_title h5 a',
-    tablePropAttr: '.attr',
-    tablePropValue: '.value',
-    infoTableRows: '#features tbody tr',
-    title: '.product h1',
-    imageLink: '#main_image img',
+    listItems: '.product',
+    listBookLink: '.product a',
+    tablePropAttr: 'div.card__info',
+    tablePropValue: 'div.card__info',
+    infoTableRows: 'div.card__params div.row .card__info',
+    title: 'h1.card__title',
+    imageLink: 'div.card__preview img',
     auhor: 'Автор',
     publisher: 'Видавництво',
     publicationYear: 'Рік видання',
     isbn: 'ISBN',
     pageNumber: 'Кількість сторінок',
-    translator: 'Перекладачі',
-    originalTitle: 'Оригінальна назва',
-    paperPrice: '#tabsPaper',
-    ebookPrice: '#tabsElectronic',
-    paperLink: '#tabsPaper',
-    ebookLink: '#tabsElectronic',
-    checkIfPaper: '#tabsPaper[class~="active"]',
+    translator: 'Перекладач',
+    originalTitle: '',
+    format: '',
+    paperPrice: '.card_price-current-real',
+    ebookPrice: '',
+    paperLink: '',
+    ebookLink: '',
+    checkIfPaper: '',
+    checkOtherFormat: false,
+    paperFormat: '',
+    ebookFormat: '',
+    splitAttr: true,
+    splitSymbol: ':',
 };
 
 const getLinksBySeacrh = async link => {
@@ -50,8 +56,13 @@ const getTableProps = tableRows => {
         const value = item(selectors.tablePropValue)
             .text()
             .trim();
+        if (selectors.splitAttr) {
+            const props = attr.split(selectors.splitSymbol);
+            return tableProps.push({ attr: props[0].trim(), value: props[1].trim() });
+        }
         tableProps.push({ attr, value });
     });
+
     return tableProps;
 };
 
@@ -59,8 +70,8 @@ const getIsbn = async link => {
     const res = await axios.get(link);
     const $ = cheerio.load(res.data);
 
-    const table = $();
-    const tableProps = getTableProps(table);
+    const tableRows = $(selectors.infoTableRows);
+    const tableProps = getTableProps(tableRows);
 
     const isbn = tableProps.find(el => el.attr === 'ISBN');
     return isbn.value;
@@ -80,6 +91,7 @@ const getBookInfo = async link => {
     const tableProps = getTableProps(tableRows);
 
     let isbn;
+    bookInfo.format = '';
     tableProps.forEach(el => {
         switch (el.attr) {
             case selectors.auhor:
@@ -103,6 +115,9 @@ const getBookInfo = async link => {
             case selectors.originalTitle:
                 bookInfo.originalTitle = el.value;
                 break;
+            case selectors.format:
+                bookInfo.format = el.value;
+                break;
             default:
                 break;
         }
@@ -123,28 +138,47 @@ const getBookInfo = async link => {
     };
 
     // check if book is paper
-    const typeButton = $(selectors.checkIfPaper).get().length;
-    if (typeButton > 0) {
-        bookInfo.isEbook = false;
-        bookInfo.paper.isbn = isbn;
-        bookInfo.paper.link = link;
+    if (selectors.checkOtherFormat) {
+        const typeButton = $(selectors.checkIfPaper).get().length;
+        if (typeButton > 0) {
+            bookInfo.isEbook = false;
+            bookInfo.paper.isbn = isbn;
+            bookInfo.paper.link = link;
 
-        const ebookLink = $(selectors.ebookLink).attr('href');
-        if (ebookLink) {
-            bookInfo.ebook.isbn = await getIsbn(ebookLink);
-            bookInfo.ebook.link = ebookLink;
+            const ebookLink = $(selectors.ebookLink).attr('href');
+            if (ebookLink) {
+                bookInfo.ebook.isbn = await getIsbn(ebookLink);
+                bookInfo.ebook.link = ebookLink;
+            }
+        } else {
+            bookInfo.isEbook = true;
+            bookInfo.ebook.isbn = isbn;
+            bookInfo.ebook.link = link;
+
+            const paperLink = $(selectors.paperLink).attr('href');
+            if (paperLink) {
+                bookInfo.paper.isbn = await getIsbn(paperLink);
+                bookInfo.paper.link = paperLink;
+            }
         }
     } else {
-        bookInfo.isEbook = true;
-        bookInfo.ebook.isbn = isbn;
-        bookInfo.ebook.link = link;
+        const props = {
+            isbn,
+            link,
+            price: parseInt(paperPrice),
+        };
 
-        const paperLink = $(selectors.paperLink).attr('href');
-        if (paperLink) {
-            bookInfo.paper.isbn = await getIsbn(paperLink);
-            bookInfo.paper.link = paperLink;
+        if (bookInfo.format === selectors.paperFormat) {
+            bookInfo.paper = props;
+            bookInfo.isEbook = false;
+        } else if (bookInfo.format === selectors.ebookFormat) {
+            bookInfo.ebook = props;
+            bookInfo.isEbook = true;
+            bookInfo.paper.price = NaN;
         }
     }
+
+    // ---------------------------------------
 
     return bookInfo;
 };
@@ -154,7 +188,7 @@ const parser = async () => {
         'https://nashformat.ua/products/ebook-ploschi-ta-vezhi.-sotsialni-zv-yazky-vid-masoniv-do-fejsbuku-620157';
     // const links = await getLinksBySeacrh(nashFormat);
     const bookInfo = await getBookInfo(
-        'https://nashformat.ua/products/sekrety-mozku.-12-strategij-rozvytku-dytyny-nova-obkladynka-709337'
+        'https://book-ye.com.ua/catalog/dytyacha-proza/roki-mij-druh-iz-sertsem-ta-hvyntykamy/'
     );
 
     console.log(bookInfo);

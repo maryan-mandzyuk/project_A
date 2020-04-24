@@ -17,10 +17,12 @@ const BookSchema = new Schema({
         type: String,
         maxlength: [500, 'Description can not be more than 500 characters'],
     },
-    author: {
-        type: Schema.Types.ObjectId,
-        ref: 'author',
-    },
+    authors: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: 'author',
+        },
+    ],
     publisher: {
         type: Schema.Types.ObjectId,
         ref: 'publisher',
@@ -29,10 +31,12 @@ const BookSchema = new Schema({
         type: Number,
         max: [5000, 'Number of page can not be more than 5000'],
     },
-    translator: {
-        type: Schema.Types.ObjectId,
-        ref: 'translator',
-    },
+    translators: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: 'translator',
+        },
+    ],
     publicationYear: {
         type: String,
         maxlength: [4, 'Year can not be more than 4 characters'],
